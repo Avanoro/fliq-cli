@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Remote MCP server for Fliq — demo mode, read-only, stateless. Deployed by
+  // Workers Builds from GitHub (push to main = deploy). The CLI itself is not
+  // deployed anywhere; it ships on npm. See src/worker.ts.
+  "name": "fliq-mcp",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-06-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "keep_vars": true,
+  // Custom domain, once the zone routing is decided (api-v2 lives on the same
+  // account). Until then the workers.dev URL from the dashboard is the endpoint:
+  // "routes": [{ "pattern": "mcp.fliqpayments.com", "custom_domain": true }],
+  "vars": {
+    // What `/` and `/health` advertise as the endpoint. Set it to the public
+    // URL when a custom domain is attached; unset, the request origin is used.
+    // "PUBLIC_MCP_URL": "https://mcp.fliqpayments.com/mcp"
+  }
+}

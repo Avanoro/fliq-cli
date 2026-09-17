@@ -1,0 +1,16 @@
+{
+  // Typecheck for the Worker entry only: Web platform + workers-types, no Node
+  // globals. wrangler bundles src/worker.ts itself; this file is for `tsc`.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true
+  },
+  "include": ["src/worker.ts"]
+}
