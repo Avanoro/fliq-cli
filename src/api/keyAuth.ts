@@ -84,7 +84,7 @@ export async function exchangeApiKey(key: string, options: ExchangeOptions = {})
   return {
     accessToken: data.accessToken,
     apiBase: data.apiBase ?? 'https://api.fliqpayments.com',
-    apiPath: (data.apiPath ?? 'v2').replace(/^\/+|\/+$/g, ''),
+    apiPath: (data.apiPath || 'v2').replace(/^\/+|\/+$/g, ''),
     email: data.user?.email ?? undefined,
   }
 }
