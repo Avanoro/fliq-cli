@@ -4,7 +4,14 @@ import { FliqApiError } from '../api/client.js'
 import type { FliqClient } from '../api/client.js'
 import { availableBalance, daysUntil } from '../format.js'
 
-export const MCP_SERVER_VERSION = '0.1.0'
+/**
+ * Surfaced on `/health`, and the only way to tell which build is serving a
+ * request. It sat at 0.1.0 through a day where four fixes were merged, two
+ * workers existed and a domain moved between them — and `/health` answered the
+ * same number the whole time, so it could not settle a single question about
+ * what was live. Bump it with anything that changes behaviour.
+ */
+export const MCP_SERVER_VERSION = '0.2.0'
 
 /**
  * The MCP tool surface, independent of transport: `fliq mcp` serves it over

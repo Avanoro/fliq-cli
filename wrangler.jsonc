@@ -3,7 +3,16 @@
   // Remote MCP server for Fliq — demo mode, read-only, stateless. Deployed by
   // Workers Builds from GitHub (push to main = deploy). The CLI itself is not
   // deployed anywhere; it ships on npm. See src/worker.ts.
-  "name": "fliq-mcp",
+  // The worker's name is the REPO's name, because that is what Workers Builds
+  // creates and maintains. Calling it "fliq-mcp" here created a second worker:
+  // the pipeline kept deploying `fliq-cli` on every merge while manual
+  // `wrangler deploy` went to `fliq-mcp`, and mcp.fliqpayments.com sat on
+  // whichever one someone had pointed it at. Four fixes were live on a worker
+  // with no domain for most of a day.
+  //
+  // One worker. The name is the repo's, the pipeline owns it, and a manual
+  // deploy now lands in the same place the automatic one does.
+  "name": "fliq-cli",
   "main": "src/worker.ts",
   "compatibility_date": "2026-06-16",
   "compatibility_flags": ["nodejs_compat"],
