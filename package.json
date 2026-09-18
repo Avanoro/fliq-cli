@@ -1,20 +1,42 @@
 {
-  "name": "@fliq/cli",
+  "name": "@fliqpayments/cli",
   "version": "0.1.0",
   "description": "fliq — Fliq Payments CLI and MCP server. Accounts, balances, transactions and payment history from the terminal or your AI assistant.",
+  "keywords": [
+    "fliq",
+    "psd2",
+    "open-banking",
+    "mcp",
+    "model-context-protocol",
+    "cli",
+    "bank",
+    "sweden"
+  ],
+  "homepage": "https://fliqpayments.com/ais",
+  "bugs": {
+    "url": "https://github.com/Avanoro/fliq-cli/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Avanoro/fliq-cli.git"
+  },
+  "license": "MIT",
+  "author": "Fliq Payments AB",
   "type": "module",
-  "license": "UNLICENSED",
-  "private": true,
   "bin": {
     "fliq": "bin/fliq.js"
   },
   "files": [
     "bin",
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

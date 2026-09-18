@@ -3,7 +3,8 @@ import { FliqApiError } from './api/client.js'
 import type { FliqClient } from './api/client.js'
 import type { Account, TransactionQuery } from './api/types.js'
 import { login } from './auth.js'
-import { clearSession, configDir, DEFAULT_API_BASE, DEFAULT_API_PATH, loadSession, saveSession } from './config.js'
+import { clearAuth, configDir, DEFAULT_API_BASE, DEFAULT_API_PATH, loadAuth, saveApiKey, saveSession } from './config.js'
+import { exchangeApiKey, looksLikeApiKey } from './api/keyAuth.js'
 import { resolveClient } from './context.js'
 import {
   accountsTable,
@@ -25,7 +26,10 @@ const program = new Command()
   .description('Fliq Payments from the terminal: accounts, balances, transactions and payment history.')
   .version(VERSION)
   .option('--json', 'machine-readable output')
-  .option('--demo', 'use the built-in example account even if you are logged in')
+  // No global --key: `login --key` stores one, and FLIQ_API_KEY covers the
+  // one-off case (it is what an MCP client config sets). Two spellings of the
+  // same flag on parent and subcommand is a footgun for no gain.
+  .option('--demo', 'use the built-in example account even if you are signed in')
   .addOption(new Option('--api <base>', 'API base URL').env('FLIQ_API_BASE').hideHelp())
   .addOption(new Option('--path <apiPath>', 'API version path (v2, dev)').env('FLIQ_API_PATH').hideHelp())
   .showHelpAfterError()
@@ -38,7 +42,9 @@ async function client(cmd: Command): Promise<FliqClient> {
   const g = globals(cmd)
   const c = await resolveClient({ demo: g.demo, apiBase: g.api, apiPath: g.path })
   if (c.mode === 'demo' && !g.json && process.stderr.isTTY) {
-    process.stderr.write('demo mode: example data for “Anna Andersson”. Run `fliq login` to see your own accounts.\n\n')
+    process.stderr.write(
+      'demo mode: example data for “Anna Andersson”. Run `fliq login --key fliq_ais_…` (create one on fliqpayments.com/ais) to see your own accounts.\n\n',
+    )
   }
   return c
 }
@@ -176,10 +182,24 @@ program
 
 program
   .command('login [email]')
-  .description('sign in with your email and a one-time code (no password)')
+  .description('sign in with an API key (--key) or with your email and a one-time code')
+  .option('--key <key>', 'API key from fliqpayments.com/ais (fliq_ais_…)')
   .option('--code <code>', 'one-time code, for non-interactive use')
   .action(async (email: string | undefined, opts, cmd: Command) => {
     const g = globals(cmd)
+
+    // An API key is the whole credential: it is traded for a session now, to
+    // prove it works before anything is written, and stored as the key itself.
+    const key = opts.key ?? (looksLikeApiKey(email) ? email : undefined)
+    if (key) {
+      const session = await exchangeApiKey(key)
+      await saveApiKey(key, session)
+      out(cmd, { status: 'logged_in', method: 'api_key', email: session.email ?? null, apiPath: session.apiPath }, () =>
+        `Signed in with an API key${session.email ? ` as ${session.email}` : ''} (API path /${session.apiPath}). Key stored in ${configDir()}.`,
+      )
+      return
+    }
+
     if (!email) {
       const { createInterface } = await import('node:readline/promises')
       const rl = createInterface({ input: process.stdin, output: process.stdout })
@@ -204,19 +224,28 @@ program
 
 program
   .command('logout')
-  .description('forget the stored session and go back to demo mode')
+  .description('forget the stored credential and go back to demo mode')
   .action(async (_opts, cmd: Command) => {
-    const had = await clearSession()
-    out(cmd, { status: had ? 'logged_out' : 'not_logged_in' }, () => (had ? 'Logged out. Back in demo mode.' : 'Not logged in.'))
+    const had = await clearAuth()
+    out(cmd, { status: had ? 'logged_out' : 'not_logged_in' }, () =>
+      had ? 'Logged out. Back in demo mode. Revoke the key on fliqpayments.com/ais to stop it working anywhere.' : 'Not logged in.',
+    )
   })
 
 program
   .command('status')
-  .description('is a session stored, and where')
+  .description('which credential is stored, and where')
   .action(async (_opts, cmd: Command) => {
-    const session = await loadSession()
-    out(cmd, { loggedIn: Boolean(session), email: session?.email ?? null, apiPath: session?.apiPath ?? null, configDir: configDir() }, () =>
-      session ? `Logged in as ${session.email} on /${session.apiPath} (${configDir()})` : `Not logged in — demo mode. Config dir: ${configDir()}`,
+    const auth = await loadAuth()
+    const envKey = Boolean(process.env.FLIQ_API_KEY)
+    const method = envKey ? 'api_key (FLIQ_API_KEY)' : auth?.apiKey ? 'api_key' : auth ? 'email sign-in' : null
+    out(
+      cmd,
+      { loggedIn: Boolean(method), method, email: auth?.email ?? null, apiPath: auth?.apiPath ?? null, configDir: configDir() },
+      () =>
+        method
+          ? `Signed in via ${method}${auth?.email ? ` as ${auth.email}` : ''} on /${auth?.apiPath ?? DEFAULT_API_PATH} (${configDir()})`
+          : `Not signed in — demo mode. Config dir: ${configDir()}`,
     )
   })
 

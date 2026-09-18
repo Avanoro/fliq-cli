@@ -11,7 +11,11 @@ import type {
 
 export interface Session {
   accessToken: string
-  refreshToken: string
+  /**
+   * Absent in API-key mode: there is no refresh token to rotate, a fresh
+   * session is minted by exchanging the key again (see `reauth`).
+   */
+  refreshToken?: string
   /** Version path the account runs, e.g. `v2` or `dev`. */
   apiPath: string
   apiBase: string
@@ -20,8 +24,14 @@ export interface Session {
 
 export interface HttpClientOptions {
   session: Session
-  /** Called with the rotated session after a successful refresh. */
+  /** Called with the new session whenever one is minted. */
   onRefresh?: (session: Session) => Promise<void> | void
+  /**
+   * Mints a fresh session when the current one expires, instead of rotating a
+   * refresh token. This is how API-key mode renews: the key is the durable
+   * credential and the session is disposable.
+   */
+  reauth?: () => Promise<Session>
   fetchImpl?: typeof fetch
 }
 
@@ -30,18 +40,20 @@ export interface HttpClientOptions {
  * the user's WorkOS session as a bearer. The gateway verifies the token and
  * forwards the identity to the workers; this client holds no other secret.
  *
- * A 401 triggers one refresh through `/app/auth/refresh` and one retry; a second
- * 401 surfaces as an error telling the user to run `fliq login` again.
+ * A 401 triggers one renewal and one retry; a second 401 surfaces as an error
+ * telling the user how to sign in again.
  */
 export class HttpClient implements FliqClient {
   readonly mode = 'live' as const
   private session: Session
   private readonly onRefresh?: HttpClientOptions['onRefresh']
+  private readonly reauth?: HttpClientOptions['reauth']
   private readonly fetchImpl: typeof fetch
 
   constructor(options: HttpClientOptions) {
     this.session = options.session
     this.onRefresh = options.onRefresh
+    this.reauth = options.reauth
     this.fetchImpl = options.fetchImpl ?? fetch
   }
 
@@ -108,6 +120,15 @@ export class HttpClient implements FliqClient {
   }
 
   private async refresh(): Promise<void> {
+    // API-key mode: mint a new session from the key rather than rotate a token.
+    if (this.reauth) {
+      this.session = await this.reauth()
+      await this.onRefresh?.(this.session)
+      return
+    }
+    if (!this.session.refreshToken) {
+      throw new FliqApiError('Session expired. Run `fliq login` again.', 401, 'SESSION_EXPIRED')
+    }
     const response = await this.fetchImpl(this.url('/app/auth/refresh'), {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
