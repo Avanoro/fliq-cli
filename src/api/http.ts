@@ -114,15 +114,33 @@ export class HttpClient implements FliqClient {
       return this.get<T>(path, true)
     }
     if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string; code?: string }
+      // Every layer on this path words a failure differently: the gateway says
+      // `{error, code}`, the Rust workers say `{code: 404, message}`, and a
+      // route that matched nothing says whatever its host says. Reading only
+      // one of those shapes turned a precise upstream answer into the word
+      // "not_found" with no idea which door said it.
+      const raw = await response.text().catch(() => '')
+      let parsed: { error?: string; code?: string | number; message?: string } = {}
+      try {
+        parsed = raw ? JSON.parse(raw) : {}
+      } catch {
+        parsed = {}
+      }
+      const said = parsed.error ?? parsed.message ?? (raw ? raw.slice(0, 160) : '')
+      // The path is half the diagnosis — the same 404 means one thing on
+      // /app/me and another on a version prefix that does not exist.
+      const where = `${this.session.apiPath}${path}`
+      const detail = said ? `${said} (${where})` : `HTTP ${response.status} on ${where}`
+      const code = typeof parsed.code === 'string' ? parsed.code : undefined
+
       if (response.status === 404 && path.includes('/transactions')) {
         throw new FliqApiError(
-          'Transactions are not served by this API path yet (account-worker feat/transactions is not deployed here).',
+          `Transactions are not served by this API path yet: ${detail}`,
           404,
-          body.code ?? 'TRANSACTIONS_UNAVAILABLE',
+          code ?? 'TRANSACTIONS_UNAVAILABLE',
         )
       }
-      throw new FliqApiError(body.error ?? `HTTP ${response.status}`, response.status, body.code)
+      throw new FliqApiError(detail, response.status, code)
     }
     return (await response.json()) as T
   }
