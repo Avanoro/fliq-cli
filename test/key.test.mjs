@@ -139,3 +139,24 @@ test('the key exchange calls fetch on the global too', async () => {
   }
   assert.equal(receiver, globalThis, 'fetch must run with the global as its receiver')
 })
+
+// ── the key travels as the credential ───────────────────────────────────────
+// The point of the change this pins: the key is sent to the gateway as the
+// bearer, and no session is minted on the way. A regression here is silent —
+// it works, it just mails the owner a sign-in code for every call.
+test('the key is the bearer, and nothing is exchanged for it', async () => {
+  const seen = []
+  const client = new HttpClient({
+    session: { accessToken: KEY, apiBase: 'https://api.example.test', apiPath: 'v2' },
+    fetchImpl: async (url, init) => {
+      seen.push({ url: String(url), auth: init?.headers?.authorization })
+      return ok({ id: 'user_1' })
+    },
+  })
+  await client.getMe()
+
+  assert.equal(seen.length, 1, 'one request, not a mint and then a read')
+  assert.equal(seen[0].auth, `Bearer ${KEY}`)
+  assert.equal(seen[0].url, 'https://api.example.test/v2/app/me')
+  assert.ok(!seen.some((r) => r.url.includes('/api/ais/token')), 'no token exchange')
+})

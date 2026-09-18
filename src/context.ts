@@ -1,8 +1,7 @@
 import type { FliqClient } from './api/client.js'
 import { DemoClient } from './api/demo.js'
 import { HttpClient } from './api/http.js'
-import { exchangeApiKey } from './api/keyAuth.js'
-import { DEFAULT_API_BASE, loadAuth, saveSession } from './config.js'
+import { DEFAULT_API_BASE, DEFAULT_API_PATH, loadAuth, saveSession } from './config.js'
 
 export interface ContextOptions {
   /** Force demo mode even when a credential is stored. */
@@ -33,17 +32,16 @@ export async function resolveClient(options: ContextOptions = {}): Promise<FliqC
   const key = options.apiKey ?? process.env.FLIQ_API_KEY ?? stored?.apiKey
 
   if (key) {
-    // The key is the credential; the session is minted now and re-minted
-    // whenever it expires, so nothing about it needs to survive this process.
-    const mint = () => exchangeApiKey(key)
-    const session = await mint()
+    // The key IS the credential and the gateway takes it as one, so there is
+    // nothing to exchange. The trade this used to make was a Magic Auth
+    // sign-in, which mailed the owner a code nobody could read or enter — once
+    // per call. See the gateway's src/auth/aisKey.ts.
     return new HttpClient({
       session: {
-        ...session,
-        apiBase: options.apiBase ?? process.env.FLIQ_API_BASE ?? session.apiBase,
-        apiPath: options.apiPath ?? process.env.FLIQ_API_PATH ?? session.apiPath,
+        accessToken: key,
+        apiBase: options.apiBase ?? process.env.FLIQ_API_BASE ?? DEFAULT_API_BASE,
+        apiPath: options.apiPath ?? process.env.FLIQ_API_PATH ?? DEFAULT_API_PATH,
       },
-      reauth: mint,
     })
   }
 
