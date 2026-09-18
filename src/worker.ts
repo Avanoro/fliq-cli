@@ -53,8 +53,13 @@ function withCors(response: Response): Response {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
-function json(data: unknown, status = 200): Response {
-  return withCors(new Response(JSON.stringify(data, null, 2), { status, headers: { 'content-type': 'application/json' } }))
+function json(data: unknown, status = 200, extra: Record<string, string> = {}): Response {
+  return withCors(
+    new Response(JSON.stringify(data, null, 2), {
+      status,
+      headers: { 'content-type': 'application/json', ...extra },
+    }),
+  )
 }
 
 /** The Fliq API key on this request, if the caller sent one. */
@@ -73,14 +78,42 @@ async function clientFor(request: Request, env: Env): Promise<FliqClient> {
 }
 
 async function handleMcp(request: Request, env: Env): Promise<Response> {
+  // Only POST carries JSON-RPC here. A client may also try to open a
+  // server-initiated stream with GET, or end a session with DELETE — neither
+  // means anything to a stateless server, and the spec's answer for that is
+  // 405. It matters: answering GET with an SSE stream that then never emits
+  // anything leaves the client waiting on a server it thinks is alive, which
+  // is exactly how a working server shows up as "failed to load, 0 tools".
+  if (request.method !== 'POST') {
+    return json(
+      {
+        error: 'Only POST is supported. This server is stateless: there is no session stream to open or close.',
+        code: 'METHOD_NOT_ALLOWED',
+        mcp: env.PUBLIC_MCP_URL ?? new URL(request.url).origin + MCP_PATH,
+      },
+      405,
+      { allow: 'POST, OPTIONS' },
+    )
+  }
+
   let client: FliqClient
   try {
     client = await clientFor(request, env)
   } catch (err) {
     // A supplied key that does not work is said out loud. Falling back to demo
     // here would hand someone fixtures under their own name.
+    //
+    // `WWW-Authenticate` says WHICH failure this is: the credential is bad, not
+    // "this resource is OAuth-protected, go discover an authorization server".
+    // Without it a client is entitled to start an OAuth dance we do not serve.
     const status = err instanceof FliqApiError ? err.status : 401
-    return json({ error: (err as Error)?.message ?? 'Key exchange failed', code: 'INVALID_KEY' }, status === 401 ? 401 : 502)
+    const message = (err as Error)?.message ?? 'Key exchange failed'
+    if (status === 401) {
+      return json({ error: message, code: 'INVALID_KEY' }, 401, {
+        'www-authenticate': `Bearer error="invalid_token", error_description="Fliq API key rejected. Create a new one on https://fliqpayments.com/ais"`,
+      })
+    }
+    return json({ error: message, code: 'KEY_EXCHANGE_FAILED' }, 502)
   }
 
   // Stateless: no session id, one server per request, nothing retained. Plain
@@ -106,6 +139,20 @@ export default {
 
     if (url.pathname === MCP_PATH || url.pathname === `${MCP_PATH}/`) {
       return handleMcp(request, env)
+    }
+
+    // Clients probe this when they get a 401, to find an authorization server.
+    // We do not run one yet, and a 404 with a reason stops the hunt sooner than
+    // a bare 404 does. When OAuth lands, this is where it gets advertised.
+    if (url.pathname.startsWith('/.well-known/oauth-')) {
+      return json(
+        {
+          error: 'This server does not use OAuth yet. Authenticate with a Fliq API key as `Authorization: Bearer fliq_ais_…`.',
+          code: 'OAUTH_NOT_SUPPORTED',
+          key: 'Create one under “Anslut dina verktyg” on https://fliqpayments.com/ais',
+        },
+        404,
+      )
     }
 
     if (url.pathname === '/health') {
