@@ -3,7 +3,7 @@ import type { FliqClient } from './api/client.js'
 import { FliqApiError } from './api/client.js'
 import { DemoClient } from './api/demo.js'
 import { HttpClient } from './api/http.js'
-import { exchangeApiKey, looksLikeApiKey } from './api/keyAuth.js'
+import { looksLikeApiKey } from './api/keyAuth.js'
 import { buildMcpServer, MCP_SERVER_VERSION } from './mcp/server.js'
 
 /**
@@ -34,7 +34,8 @@ export interface Env {
   /** Optional: what `/` and `/health` report as the public endpoint. */
   PUBLIC_MCP_URL?: string
   /** Where an API key is exchanged for a session; defaults to the live site. */
-  FLIQ_TOKEN_URL?: string
+  FLIQ_API_BASE?: string
+  FLIQ_API_PATH?: string
 }
 
 const MCP_PATH = '/mcp'
@@ -72,9 +73,16 @@ function presentedKey(request: Request): string | null {
 async function clientFor(request: Request, env: Env): Promise<FliqClient> {
   const key = presentedKey(request)
   if (!key) return new DemoClient()
-  const mint = () => exchangeApiKey(key, { tokenUrl: env.FLIQ_TOKEN_URL })
-  const session = await mint()
-  return new HttpClient({ session, reauth: mint })
+  // Straight through. The gateway takes the key as the credential it is, so
+  // there is no session to mint and nothing to re-mint when one expires — and
+  // no Magic Auth mail to the owner for a sign-in nobody performed.
+  return new HttpClient({
+    session: {
+      accessToken: key,
+      apiBase: env.FLIQ_API_BASE ?? 'https://api.fliqpayments.com',
+      apiPath: env.FLIQ_API_PATH ?? 'v2',
+    },
+  })
 }
 
 async function handleMcp(request: Request, env: Env): Promise<Response> {
