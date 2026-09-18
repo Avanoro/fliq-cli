@@ -128,7 +128,7 @@ export default {
           'fliq_list_transactions',
           'fliq_list_payment_orders',
         ],
-        cli: 'npx @fliq/cli',
+        cli: 'npx @fliqpayments/cli',
       })
     }
 
