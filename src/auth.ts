@@ -29,7 +29,7 @@ interface SessionResponse {
  * consent flow and always happens in a browser.
  */
 export async function login(options: LoginOptions): Promise<Session> {
-  const fetchImpl = options.fetchImpl ?? fetch
+  const fetchImpl = options.fetchImpl ?? fetch.bind(globalThis)
   const base = `${options.apiBase.replace(/\/$/, '')}/${options.apiPath.replace(/^\/+|\/+$/g, '')}/app/auth`
   const email = options.email.trim().toLowerCase()
 

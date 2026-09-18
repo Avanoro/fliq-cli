@@ -97,3 +97,45 @@ test('without a refresh token and without reauth, the advice is to sign in again
   })
   await assert.rejects(client.listAccounts(), /fliq login/)
 })
+
+// ── the receiver `fetch` is called with ──────────────────────────────────────
+// workerd rejects a native `fetch` whose receiver is anything but the global
+// object, with "Illegal invocation". Node does not check, so this only ever
+// showed up on the Worker — and only on a call that reached the network, which
+// is why tools/list worked and tools/call did not. These pin the binding down
+// where Node can see it.
+test('the default fetch is called on the global, not on the client', async () => {
+  const real = globalThis.fetch
+  let receiver = 'unset'
+  globalThis.fetch = function (...args) {
+    receiver = this
+    return ok({ id: 'user_1' })
+  }
+  try {
+    // Constructed AFTER the stub is installed, so it captures the stub.
+    const client = new HttpClient({
+      session: { accessToken: 't', refreshToken: 'r', apiBase: 'https://example.test', apiPath: 'v2' },
+    })
+    await client.getMe()
+  } finally {
+    globalThis.fetch = real
+  }
+  assert.equal(receiver, globalThis, 'fetch must run with the global as its receiver')
+})
+
+test('the key exchange calls fetch on the global too', async () => {
+  const real = globalThis.fetch
+  let receiver = 'unset'
+  globalThis.fetch = function () {
+    receiver = this
+    return ok({ accessToken: 'a', refreshToken: 'r' })
+  }
+  try {
+    await exchangeApiKey(KEY, { tokenUrl: TOKEN_URL })
+  } catch {
+    // The shape of the answer is another test's business; the receiver is this one's.
+  } finally {
+    globalThis.fetch = real
+  }
+  assert.equal(receiver, globalThis, 'fetch must run with the global as its receiver')
+})

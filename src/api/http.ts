@@ -48,13 +48,21 @@ export class HttpClient implements FliqClient {
   private session: Session
   private readonly onRefresh?: HttpClientOptions['onRefresh']
   private readonly reauth?: HttpClientOptions['reauth']
+  /**
+   * Bound to the global on purpose. `fetch` is a native function whose receiver
+   * must be the global object: stored on an instance and called as
+   * `this.fetchImpl(...)` it arrives with that instance as `this`, and workerd
+   * answers "Illegal invocation". Node's fetch does not check, which is why this
+   * ran for months in the CLI and failed the moment the same code served a
+   * tools/call on the Worker.
+   */
   private readonly fetchImpl: typeof fetch
 
   constructor(options: HttpClientOptions) {
     this.session = options.session
     this.onRefresh = options.onRefresh
     this.reauth = options.reauth
-    this.fetchImpl = options.fetchImpl ?? fetch
+    this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis)
   }
 
   get label() {
