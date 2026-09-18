@@ -51,7 +51,7 @@ export async function exchangeApiKey(key: string, options: ExchangeOptions = {})
       'INVALID_KEY_FORMAT',
     )
   }
-  const fetchImpl = options.fetchImpl ?? fetch
+  const fetchImpl = options.fetchImpl ?? fetch.bind(globalThis)
   const url = options.tokenUrl ?? process.env.FLIQ_TOKEN_URL ?? DEFAULT_TOKEN_URL
 
   let response: Response
