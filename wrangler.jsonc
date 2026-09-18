@@ -9,12 +9,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   "keep_vars": true,
-  // Custom domain, once the zone routing is decided (api-v2 lives on the same
-  // account). Until then the workers.dev URL from the dashboard is the endpoint:
-  // "routes": [{ "pattern": "mcp.fliqpayments.com", "custom_domain": true }],
+  // The public endpoint. The workers.dev URL still answers; this is the name
+  // clients are given, and the one the docs and /ais print.
+  "routes": [{ "pattern": "mcp.fliqpayments.com", "custom_domain": true }],
   "vars": {
-    // What `/` and `/health` advertise as the endpoint. Set it to the public
-    // URL when a custom domain is attached; unset, the request origin is used.
-    // "PUBLIC_MCP_URL": "https://mcp.fliqpayments.com/mcp"
+    // What `/` and `/health` advertise as the endpoint. Left unset on purpose:
+    // the request origin is used, so the custom domain and the workers.dev URL
+    // each advertise themselves instead of one lying about the other.
   }
 }

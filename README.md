@@ -80,8 +80,8 @@ The same tools are also served over Streamable HTTP from a Cloudflare Worker
 than a command: Cursor, VS Code, Claude Code.
 
 ```
-https://fliq-mcp.avanoro.workers.dev/mcp        # MCP endpoint (POST JSON-RPC)
-https://fliq-mcp.avanoro.workers.dev/health     # liveness + version
+https://mcp.fliqpayments.com/mcp        # MCP endpoint (POST JSON-RPC)
+https://mcp.fliqpayments.com/health     # liveness + version
 ```
 
 Which account it serves is decided **per request** by the `Authorization`
@@ -137,7 +137,7 @@ npm run worker:dev          # remote MCP server on http://127.0.0.1:8787/mcp
 ```
 
 Deploys: the Worker goes out with `npx wrangler deploy` (live at
-`fliq-mcp.avanoro.workers.dev`); Workers Builds is not wired to this repo. The
+`mcp.fliqpayments.com`); Workers Builds is not wired to this repo. The
 CLI is published to npm by hand for now.
 
 Environment overrides: `FLIQ_API_KEY`, `FLIQ_DEMO=1`, `FLIQ_API_BASE`,
