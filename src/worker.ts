@@ -79,8 +79,8 @@ async function clientFor(request: Request, env: Env): Promise<FliqClient> {
   return new HttpClient({
     session: {
       accessToken: key,
-      apiBase: env.FLIQ_API_BASE ?? 'https://api.fliqpayments.com',
-      apiPath: env.FLIQ_API_PATH ?? 'v2',
+      apiBase: env.FLIQ_API_BASE || 'https://api.fliqpayments.com',
+      apiPath: env.FLIQ_API_PATH || 'v2',
     },
   })
 }

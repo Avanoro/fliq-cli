@@ -43,6 +43,9 @@ export interface HttpClientOptions {
  * A 401 triggers one renewal and one retry; a second 401 surfaces as an error
  * telling the user how to sign in again.
  */
+/** Used when a session arrives without a usable one. Never a silent ''. */
+const FALLBACK_API_PATH = 'v2'
+
 export class HttpClient implements FliqClient {
   readonly mode = 'live' as const
   private session: Session
@@ -97,8 +100,20 @@ export class HttpClient implements FliqClient {
     return this.get<TransactionPage>(`/app/me/accounts/${encodeURIComponent(accountId)}/transactions${qs}`)
   }
 
+  /**
+   * The version prefix is not optional, and an empty one is not a smaller
+   * mistake than a wrong one — it is a bigger one. `https://api…/app/me` does
+   * not reach a door that answers 401; it reaches nothing, and the gateway's
+   * host says `{"error":"not_found"}` with a 404 that reads like the user has
+   * no accounts rather than like a misconfigured client.
+   *
+   * So a blank, missing or slash-only prefix becomes the default here, at the
+   * one place every request passes, rather than at each of the three places a
+   * session is put together.
+   */
   private url(path: string): string {
-    return `${this.session.apiBase.replace(/\/$/, '')}/${this.session.apiPath.replace(/^\/+|\/+$/g, '')}${path}`
+    const prefix = String(this.session.apiPath ?? '').replace(/^\/+|\/+$/g, '') || FALLBACK_API_PATH
+    return `${this.session.apiBase.replace(/\/$/, '')}/${prefix}${path}`
   }
 
   private async get<T>(path: string, retried = false): Promise<T> {

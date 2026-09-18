@@ -160,3 +160,28 @@ test('the key is the bearer, and nothing is exchanged for it', async () => {
   assert.equal(seen[0].url, 'https://api.example.test/v2/app/me')
   assert.ok(!seen.some((r) => r.url.includes('/api/ais/token')), 'no token exchange')
 })
+
+// ── the version prefix is never allowed to go missing ───────────────────────
+// `https://api…/app/me` does not reach a door that answers 401 — it reaches
+// nothing, and the host answers {"error":"not_found"} with a 404 that reads
+// like the user has no accounts rather than like a broken client. That is one
+// empty string away at three different call sites, so it is guarded here.
+for (const [label, apiPath] of [
+  ['an empty prefix', ''],
+  ['a missing prefix', undefined],
+  ['a slash-only prefix', '/'],
+  ['a padded prefix', '/v2/'],
+]) {
+  test(`${label} still reaches a real door`, async () => {
+    let asked = ''
+    const client = new HttpClient({
+      session: { accessToken: KEY, apiBase: 'https://api.example.test', apiPath },
+      fetchImpl: async (url) => {
+        asked = String(url)
+        return ok({ id: 'user_1' })
+      },
+    })
+    await client.getMe()
+    assert.equal(asked, 'https://api.example.test/v2/app/me')
+  })
+}
