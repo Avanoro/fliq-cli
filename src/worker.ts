@@ -36,6 +36,8 @@ export interface Env {
   /** Where an API key is exchanged for a session; defaults to the live site. */
   FLIQ_API_BASE?: string
   FLIQ_API_PATH?: string
+  /** Service binding to fliq-public-api-v2. See wrangler.jsonc. */
+  GATEWAY?: Fetcher
 }
 
 const MCP_PATH = '/mcp'
@@ -76,12 +78,16 @@ async function clientFor(request: Request, env: Env): Promise<FliqClient> {
   // Straight through. The gateway takes the key as the credential it is, so
   // there is no session to mint and nothing to re-mint when one expires — and
   // no Magic Auth mail to the owner for a sign-in nobody performed.
+  const gateway = env.GATEWAY
   return new HttpClient({
     session: {
       accessToken: key,
       apiBase: env.FLIQ_API_BASE || 'https://api.fliqpayments.com',
       apiPath: env.FLIQ_API_PATH || 'v2',
     },
+    // Over the binding when there is one. The URL is still the real one, so
+    // the gateway sees the path it expects and nothing else has to know.
+    ...(gateway ? { fetchImpl: (input: RequestInfo | URL, init?: RequestInit) => gateway.fetch(input as never, init) } : {}),
   })
 }
 
