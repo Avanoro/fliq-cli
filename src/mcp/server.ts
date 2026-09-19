@@ -11,7 +11,7 @@ import { availableBalance, daysUntil } from '../format.js'
  * same number the whole time, so it could not settle a single question about
  * what was live. Bump it with anything that changes behaviour.
  */
-export const MCP_SERVER_VERSION = '0.2.1'
+export const MCP_SERVER_VERSION = '0.2.2'
 
 /**
  * The MCP tool surface, independent of transport: `fliq mcp` serves it over

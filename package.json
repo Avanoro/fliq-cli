@@ -1,6 +1,6 @@
 {
   "name": "@fliqpayments/cli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "fliq \u2014 Fliq Payments CLI and MCP server. Accounts, balances, transactions and payment history from the terminal or your AI assistant.",
   "keywords": [
     "fliq",

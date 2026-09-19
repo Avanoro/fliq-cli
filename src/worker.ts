@@ -85,6 +85,7 @@ async function clientFor(request: Request, env: Env): Promise<FliqClient> {
       apiBase: env.FLIQ_API_BASE || 'https://api.fliqpayments.com',
       apiPath: env.FLIQ_API_PATH || 'v2',
     },
+    credential: 'key' as const,
     // Over the binding when there is one. The URL is still the real one, so
     // the gateway sees the path it expects and nothing else has to know.
     ...(gateway ? { fetchImpl: (input: RequestInfo | URL, init?: RequestInit) => gateway.fetch(input as never, init) } : {}),
