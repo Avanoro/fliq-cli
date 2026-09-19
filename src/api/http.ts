@@ -33,6 +33,11 @@ export interface HttpClientOptions {
    */
   reauth?: () => Promise<Session>
   fetchImpl?: typeof fetch
+  /**
+   * `'key'` when `session.accessToken` is a Fliq API key rather than a WorkOS
+   * session. It changes only what a 401 means; see `get`.
+   */
+  credential?: 'session' | 'key'
 }
 
 /**
@@ -59,12 +64,15 @@ export class HttpClient implements FliqClient {
    * ran for months in the CLI and failed the moment the same code served a
    * tools/call on the Worker.
    */
+  /** Which kind of credential the session holds. See the 401 handling below. */
+  private readonly credential: 'session' | 'key'
   private readonly fetchImpl: typeof fetch
 
   constructor(options: HttpClientOptions) {
     this.session = options.session
     this.onRefresh = options.onRefresh
     this.reauth = options.reauth
+    this.credential = options.credential ?? 'session'
     this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis)
   }
 
@@ -124,7 +132,13 @@ export class HttpClient implements FliqClient {
         'user-agent': 'fliq-cli',
       },
     })
-    if (response.status === 401 && !retried) {
+    // A 401 means different things to the two credentials. A session may simply
+    // have aged out, so it is renewed and retried, and when it cannot be
+    // renewed "sign in again" is the right advice. A key cannot age out and
+    // cannot be renewed: a 401 means the gateway refused it. Sending a key
+    // holder to `fliq login` hid the gateway's own answer behind advice they
+    // have no way to follow.
+    if (response.status === 401 && !retried && this.credential === 'session') {
       await this.refresh()
       return this.get<T>(path, true)
     }

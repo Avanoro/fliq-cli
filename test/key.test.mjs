@@ -185,3 +185,23 @@ for (const [label, apiPath] of [
     assert.equal(asked, 'https://api.example.test/v2/app/me')
   })
 }
+
+// ── a refused key is not an expired session ─────────────────────────────────
+test('a 401 in key mode surfaces the gateway, not login advice', async () => {
+  let calls = 0
+  const client = new HttpClient({
+    session: { accessToken: KEY, apiBase: 'https://api.example.test', apiPath: 'v2' },
+    credential: 'key',
+    fetchImpl: async () => {
+      calls += 1
+      return err(401, { error: 'That API key is not valid any more.', code: 'INVALID_KEY' })
+    },
+  })
+  await assert.rejects(client.getMe(), (e) => {
+    assert.equal(e.code, 'INVALID_KEY')
+    assert.match(e.message, /not valid any more/)
+    assert.doesNotMatch(e.message, /fliq login/)
+    return true
+  })
+  assert.equal(calls, 1, 'nothing to renew, so nothing to retry')
+})

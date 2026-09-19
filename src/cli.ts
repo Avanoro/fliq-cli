@@ -4,7 +4,9 @@ import type { FliqClient } from './api/client.js'
 import type { Account, TransactionQuery } from './api/types.js'
 import { login } from './auth.js'
 import { clearAuth, configDir, DEFAULT_API_BASE, DEFAULT_API_PATH, loadAuth, saveApiKey, saveSession } from './config.js'
-import { exchangeApiKey, looksLikeApiKey } from './api/keyAuth.js'
+import { looksLikeApiKey } from './api/keyAuth.js'
+import { HttpClient } from './api/http.js'
+import type { Session } from './api/http.js'
 import { resolveClient } from './context.js'
 import {
   accountsTable,
@@ -188,11 +190,23 @@ program
   .action(async (email: string | undefined, opts, cmd: Command) => {
     const g = globals(cmd)
 
-    // An API key is the whole credential: it is traded for a session now, to
-    // prove it works before anything is written, and stored as the key itself.
+    // An API key is the whole credential. It is checked against the gateway
+    // before anything is written — but by USING it, not by trading it for a
+    // session. The trade was a Magic Auth challenge, which mails the owner a
+    // sign-in code for a sign-in nobody performed; `fliq login --key` was the
+    // last caller of it left.
     const key = opts.key ?? (looksLikeApiKey(email) ? email : undefined)
     if (key) {
-      const session = await exchangeApiKey(key)
+      const apiPath = g.path ?? process.env.FLIQ_API_PATH ?? DEFAULT_API_PATH
+      const apiBase = g.api ?? process.env.FLIQ_API_BASE ?? DEFAULT_API_BASE
+      const probe = new HttpClient({
+        session: { accessToken: key, apiBase, apiPath },
+        credential: 'key',
+      })
+      // Throws with the gateway's own wording if the key is refused, which is
+      // exactly what the person needs to read.
+      const me = await probe.getMe()
+      const session: Session = { accessToken: key, apiBase, apiPath, email: me.profile.email ?? undefined }
       await saveApiKey(key, session)
       out(cmd, { status: 'logged_in', method: 'api_key', email: session.email ?? null, apiPath: session.apiPath }, () =>
         `Signed in with an API key${session.email ? ` as ${session.email}` : ''} (API path /${session.apiPath}). Key stored in ${configDir()}.`,

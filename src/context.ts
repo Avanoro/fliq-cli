@@ -42,6 +42,7 @@ export async function resolveClient(options: ContextOptions = {}): Promise<FliqC
         apiBase: options.apiBase ?? process.env.FLIQ_API_BASE ?? DEFAULT_API_BASE,
         apiPath: options.apiPath ?? process.env.FLIQ_API_PATH ?? DEFAULT_API_PATH,
       },
+    credential: 'key' as const,
     })
   }
 
