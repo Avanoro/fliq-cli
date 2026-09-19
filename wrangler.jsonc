@@ -21,6 +21,22 @@
   // The public endpoint. The workers.dev URL still answers; this is the name
   // clients are given, and the one the docs and /ais print.
   "routes": [{ "pattern": "mcp.fliqpayments.com", "custom_domain": true }],
+
+  /**
+   * The gateway, reached directly rather than over its public hostname.
+   *
+   * Both workers sit on fliqpayments.com, and a subrequest from one worker to a
+   * URL routed to another worker on the SAME zone does not re-enter that
+   * worker — it falls through to the zone's origin, which answers
+   * `{"error":"not_found"}` with a 404. From outside, the identical URL reaches
+   * the gateway and answers properly. That difference is invisible from here
+   * and reads exactly like a wrong path, which is what it was mistaken for.
+   *
+   * A binding is not a workaround for that; it is what this call always should
+   * have been. It skips DNS, TLS and the edge, cannot be intercepted, and does
+   * not depend on the gateway keeping a public hostname.
+   */
+  "services": [{ "binding": "GATEWAY", "service": "fliq-public-api-v2" }],
   "vars": {
     // What `/` and `/health` advertise as the endpoint. Left unset on purpose:
     // the request origin is used, so the custom domain and the workers.dev URL
