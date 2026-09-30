@@ -1,45 +1,71 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Remote MCP server for Fliq — demo mode, read-only, stateless. Deployed by
-  // Workers Builds from GitHub (push to main = deploy). The CLI itself is not
-  // deployed anywhere; it ships on npm. See src/worker.ts.
-  // The worker's name is the REPO's name, because that is what Workers Builds
-  // creates and maintains. Calling it "fliq-mcp" here created a second worker:
-  // the pipeline kept deploying `fliq-cli` on every merge while manual
-  // `wrangler deploy` went to `fliq-mcp`, and mcp.fliqpayments.com sat on
-  // whichever one someone had pointed it at. Four fixes were live on a worker
-  // with no domain for most of a day.
+  // Remote MCP server for Fliq — demo mode, read-only, stateless. The CLI
+  // itself is not deployed anywhere; it ships on npm. See src/worker.ts.
   //
-  // One worker. The name is the repo's, the pipeline owns it, and a manual
-  // deploy now lands in the same place the automatic one does.
-  "name": "fliq-cli",
+  // Two environments, each defined in full below. Deploy with --env, always:
+  //
+  //   env       account   worker name   host                   deployed by
+  //   -------   -------   -----------   --------------------   ------------------------
+  //   staging   STAGING   fliq-cli      mcp.fliqpayments.dev   release.yml (push to main)
+  //   prod      PROD      fliq-cli      mcp.fliqpayments.com   release.yml, promote run
+  //
+  // Named envs inherit only main / compatibility_date / compatibility_flags
+  // from here, NOT routes, services or observability, so each env below is its
+  // complete set. [env.staging] keeps the live Worker's name. The top-level
+  // name is a different, unused one, so a bare `wrangler deploy` cannot deploy
+  // over staging. Each env pins its account with account_id, which wrangler
+  // prefers over CLOUDFLARE_ACCOUNT_ID.
+  //
+  // One Worker per env, named after the repo: calling it "fliq-mcp" once
+  // created a second worker, and mcp.fliqpayments.com sat on whichever one
+  // someone had pointed it at.
+  "name": "fliq-cli-no-env",
   "main": "src/worker.ts",
   "compatibility_date": "2026-06-16",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
   "keep_vars": true,
-  // The public endpoint. The workers.dev URL still answers; this is the name
-  // clients are given, and the one the docs and /ais print.
-  "routes": [{ "pattern": "mcp.fliqpayments.com", "custom_domain": true }],
 
-  /**
-   * The gateway, reached directly rather than over its public hostname.
+  /*
+   * GATEWAY: the gateway, reached directly rather than over its public
+   * hostname. A subrequest from one worker to a URL routed to another worker
+   * on the SAME zone does not re-enter that worker — it falls through to the
+   * zone's origin, which answers `{"error":"not_found"}` with a 404, which
+   * reads exactly like a wrong path. A binding skips DNS, TLS and the edge and
+   * does not depend on the gateway keeping a public hostname. Each env binds
+   * the gateway in its own account.
    *
-   * Both workers sit on fliqpayments.com, and a subrequest from one worker to a
-   * URL routed to another worker on the SAME zone does not re-enter that
-   * worker — it falls through to the zone's origin, which answers
-   * `{"error":"not_found"}` with a 404. From outside, the identical URL reaches
-   * the gateway and answers properly. That difference is invisible from here
-   * and reads exactly like a wrong path, which is what it was mistaken for.
-   *
-   * A binding is not a workaround for that; it is what this call always should
-   * have been. It skips DNS, TLS and the edge, cannot be intercepted, and does
-   * not depend on the gateway keeping a public hostname.
+   * No vars: what `/` and `/health` advertise as the endpoint is the request
+   * origin, so the custom domain and the workers.dev URL each advertise
+   * themselves.
    */
-  "services": [{ "binding": "GATEWAY", "service": "fliq-public-api-v2" }],
-  "vars": {
-    // What `/` and `/health` advertise as the endpoint. Left unset on purpose:
-    // the request origin is used, so the custom domain and the workers.dev URL
-    // each advertise themselves instead of one lying about the other.
+  "env": {
+    // ========================================================================
+    // staging: STAGING account, on the .dev twin of prod's host:
+    // mcp.fliqpayments.com moved to the PROD account with the fliqpayments.com
+    // zone on 2026-09-30.
+    // ========================================================================
+    "staging": {
+      "name": "fliq-cli",
+      "account_id": "5b0e40ebe9ba5e2ee8107138e492ed7f", // STAGING account
+      "observability": { "enabled": true },
+      "routes": [{ "pattern": "mcp.fliqpayments.dev", "custom_domain": true }],
+      "services": [{ "binding": "GATEWAY", "service": "fliq-public-api-v2" }],
+      // The code defaults to prod's API host; staging's gateway is on .dev.
+      "vars": { "FLIQ_API_BASE": "https://api.fliqpayments.dev" }
+    },
+
+    // ========================================================================
+    // prod: PROD account. The public endpoint clients are given, and the one
+    // the docs and /ais print. The workers.dev URL is off.
+    // ========================================================================
+    "prod": {
+      "name": "fliq-cli",
+      "account_id": "ee81b6d8d31ad84c375e2cbff057369a", // PROD account
+      "workers_dev": false,
+      "observability": { "enabled": true },
+      "routes": [{ "pattern": "mcp.fliqpayments.com", "custom_domain": true }],
+      "services": [{ "binding": "GATEWAY", "service": "fliq-public-api-v2" }]
+    }
   }
 }

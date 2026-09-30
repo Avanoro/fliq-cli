@@ -1,0 +1,43 @@
+# Merging into main puts it on staging; promoting puts it on prod.
+#
+#   push to main              ──▶ CI ──▶ deploy staging
+#   Run workflow, promote ✓   ──▶ CI ──▶ is this commit serving on staging?
+#                                        ──▶ deploy prod ──▶ tag
+#
+# To release to prod: Actions → Release → Run workflow (branch: main) → tick
+# "promote". It deploys the head of main, and only if that exact commit is the
+# one staging is serving successfully; the tag is cut once prod serves it. See
+# Avanoro/gha-workflows release-pipeline.yml.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+  # Manual. Without `promote`: redeploy main to staging. With it: release the
+  # commit staging is serving to prod. Both are main-only.
+  workflow_dispatch:
+    inputs:
+      promote:
+        description: "Release to prod: deploy the commit staging is serving, and tag it"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    permissions:
+      contents: write     # the tag and GitHub Release
+      deployments: read   # the promote check reads staging's deployments
+      actions: read       # the promote run fetches staging's build (build once, deploy everywhere)
+    uses: Avanoro/gha-workflows/.github/workflows/release-pipeline.yml@main
+    with:
+      promote: ${{ inputs.promote == true }}
+    secrets: inherit
