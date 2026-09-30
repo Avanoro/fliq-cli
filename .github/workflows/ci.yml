@@ -1,0 +1,12 @@
+# Merge gate: typecheck and tests plus a wrangler dry-run build of every env. The job
+# lives in Avanoro/gha-workflows. release.yml calls it too, so a push to main
+# is checked before it deploys.
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  ci:
+    uses: Avanoro/gha-workflows/.github/workflows/ts-worker-ci.yml@main

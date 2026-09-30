@@ -142,3 +142,16 @@ CLI is published to npm by hand for now.
 
 Environment overrides: `FLIQ_API_KEY`, `FLIQ_DEMO=1`, `FLIQ_API_BASE`,
 `FLIQ_API_PATH` (`v2`, `dev`), `FLIQ_TOKEN_URL`, `FLIQ_CONFIG_DIR`.
+
+## Deploys (the MCP worker)
+
+Deploys go through GitHub Actions (`.github/workflows/release.yml`, backed by
+Avanoro/gha-workflows `release-pipeline.yml`):
+
+| env | account | host | deployed by |
+|---|---|---|---|
+| `staging` | STAGING | `mcp.fliqpayments.dev` | every push to `main` |
+| `prod` | PROD | `mcp.fliqpayments.com` | Actions → Release → Run workflow (branch `main`) → tick **promote** |
+
+Never run a bare `wrangler deploy`: the top level of `wrangler.jsonc` is an
+unused sentinel. The npm package is released separately.

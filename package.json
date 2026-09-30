@@ -44,9 +44,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json",
     "test": "npm run build && node --test test/*.test.mjs",
     "prepack": "npm run build",
-    "worker:dev": "wrangler dev",
-    "worker:deploy": "wrangler deploy",
-    "deploy": "wrangler deploy"
+    "worker:dev": "wrangler dev --env staging",
+    "worker:deploy": "echo 'Deploys go through CI: merge to main for staging, promote for prod (.github/workflows/release.yml)' && exit 1",
+    "deploy": "echo 'Deploys go through CI: merge to main for staging, promote for prod (.github/workflows/release.yml)' && exit 1"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",
